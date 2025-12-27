@@ -4,18 +4,68 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function App() {
 
   // 🔁 CHANGE TO false ON REAL BIRTHDAY
-  const TEST_MODE = false; // true = 10 sec test | false = real date
+  const TEST_MODE = true; // true = 10 sec test | false = real date
 
   const [stage, setStage] = useState("countdown");
   const [timeLeft, setTimeLeft] = useState(null);
+  const [candlesLit, setCandlesLit] = useState(3);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const [showFireworks, setShowFireworks] = useState(false);
+  const [openedGifts, setOpenedGifts] = useState([]);
+  const [scratchRevealed, setScratchRevealed] = useState(false);
+  const [quizAnswers, setQuizAnswers] = useState({});
+  const [showQuizResult, setShowQuizResult] = useState(false);
+  const [typewriterText, setTypewriterText] = useState("");
+  const [showCamera, setShowCamera] = useState(false);
   const musicRef = useRef(null);
+  const audioContextRef = useRef(null);
+  const canvasRef = useRef(null);
+  const videoRef = useRef(null);
+
+  const giftMessages = [
+    "You're an amazing friend! 💝",
+    "Your smile lights up the room! ✨",
+    "Stay awesome always! 🌟",
+    "You make the world better! 🌍",
+  ];
+
+  const quizQuestions = [
+    {
+      q: "What's your superpower?",
+      options: ["Making people smile 😊", "Being awesome 🌟", "Spreading joy 🎉", "All of the above! 💫"],
+      correct: 3
+    },
+    {
+      q: "What makes you special?",
+      options: ["Your kindness 💝", "Your energy ⚡", "Your humor 😄", "Everything! ✨"],
+      correct: 3
+    },
+    {
+      q: "Best thing about you?",
+      options: ["Your heart ❤️", "Your vibe 🌈", "Your smile 😁", "Can't pick one! 🎊"],
+      correct: 3
+    }
+  ];
 
   // ⏳ COUNTDOWN LOGIC
   useEffect(() => {
-    const target = TEST_MODE
-  ? new Date(Date.now() + 10 * 1000)
-  : new Date(2026, 9, 9, 0, 0, 0); // ✅ 9 Oct 12:00 AM IST
-
+    let target;
+    
+    if (TEST_MODE) {
+      target = new Date(Date.now() + 10 * 1000);
+    } else {
+      const now = new Date();
+      const birthdayMonth = 9; // October (0-indexed, so 9 = October)
+      const birthdayDay = 9;   // 9th day
+      
+      // Try current year first
+      target = new Date(now.getFullYear(), birthdayMonth, birthdayDay, 0, 0, 0);
+      
+      // If birthday already passed this year, set to next year
+      if (target <= now) {
+        target = new Date(now.getFullYear() + 1, birthdayMonth, birthdayDay, 0, 0, 0);
+      }
+    }
 
     const timer = setInterval(() => {
       const diff = target - new Date();
@@ -34,6 +84,121 @@ export default function App() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // 🎤 MICROPHONE BLOW DETECTION
+  useEffect(() => {
+    if (stage !== "cake" || candlesLit === 0) return;
+
+    let animationId;
+    const startListening = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        audioContextRef.current = audioContext;
+        
+        const analyser = audioContext.createAnalyser();
+        const microphone = audioContext.createMediaStreamSource(stream);
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        
+        microphone.connect(analyser);
+        analyser.fftSize = 512;
+
+        const checkBlow = () => {
+          analyser.getByteFrequencyData(dataArray);
+          const average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+          
+          // Lower threshold for easier blowing
+          if (average > 25) {
+            setCandlesLit(prev => {
+              const newVal = Math.max(0, prev - 1);
+              if (newVal === 0) {
+                setShowConfetti(true);
+                setTimeout(() => setShowConfetti(false), 5000);
+              }
+              return newVal;
+            });
+          }
+          
+          if (candlesLit > 0) {
+            animationId = requestAnimationFrame(checkBlow);
+          }
+        };
+        
+        checkBlow();
+      } catch (err) {
+        console.log("Microphone access denied - click candles to blow them out manually");
+      }
+    };
+
+    startListening();
+
+    return () => {
+      if (animationId) cancelAnimationFrame(animationId);
+      if (audioContextRef.current) {
+        audioContextRef.current.close();
+      }
+    };
+  }, [stage, candlesLit]);
+
+  // ✍️ TYPEWRITER EFFECT
+  useEffect(() => {
+    if (stage === "final") {
+      const fullText = "This isn't just a surprise… it's a small way of saying you matter more than you know 💗";
+      let index = 0;
+      
+      const timer = setInterval(() => {
+        if (index <= fullText.length) {
+          setTypewriterText(fullText.slice(0, index));
+          index++;
+        } else {
+          clearInterval(timer);
+        }
+      }, 50);
+
+      return () => clearInterval(timer);
+    }
+  }, [stage]);
+
+  // 🎨 SCRATCH CARD HANDLER
+  const handleScratch = (e) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    
+    const ctx = canvas.getContext('2d');
+    const rect = canvas.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    
+    ctx.globalCompositeOperation = 'destination-out';
+    ctx.beginPath();
+    ctx.arc(x, y, 20, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Check if enough is scratched
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const pixels = imageData.data;
+    let transparent = 0;
+    
+    for (let i = 3; i < pixels.length; i += 4) {
+      if (pixels[i] === 0) transparent++;
+    }
+    
+    if (transparent / (pixels.length / 4) > 0.5) {
+      setScratchRevealed(true);
+    }
+  };
+
+  // 📸 CAMERA SETUP
+  const startCamera = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+      }
+    } catch (err) {
+      console.log("Camera access denied");
+    }
+  };
 
   return (
     <div className="min-h-screen flex items-center justify-center overflow-hidden
@@ -85,17 +250,195 @@ export default function App() {
               A day as special as you 💖
             </p>
 
+            <div className="flex gap-4 justify-center flex-wrap">
+              <button
+                onClick={() => {
+                  musicRef.current.volume = 0.4;
+                  musicRef.current.play();
+                  setStage("scratch");
+                }}
+                className="px-12 py-4 bg-gradient-to-r from-pink-500 to-fuchsia-500
+                           text-white rounded-full text-xl shadow-lg hover:scale-105 transition"
+              >
+                Let's Celebrate 🎂
+              </button>
+            </div>
+          </motion.div>
+        )}
+
+        {/* 🎨 SCRATCH CARD */}
+        {stage === "scratch" && (
+          <motion.div
+            key="scratch"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl shadow-2xl px-12 py-12 text-center max-w-lg"
+          >
+            <h2 className="text-3xl mb-6 text-gray-800">
+              Scratch to reveal your surprise! 🎁
+            </h2>
+            
+            <div className="relative inline-block">
+              {!scratchRevealed && (
+                <canvas
+                  ref={canvasRef}
+                  width={300}
+                  height={200}
+                  onMouseMove={(e) => e.buttons === 1 && handleScratch(e)}
+                  onTouchMove={(e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    handleScratch(touch);
+                  }}
+                  className="absolute top-0 left-0 cursor-pointer"
+                  style={{ touchAction: 'none' }}
+                />
+              )}
+              
+              <div className="w-[300px] h-[200px] bg-gradient-to-br from-purple-400 to-pink-400 
+                            rounded-2xl flex items-center justify-center text-white text-xl font-bold p-6">
+                You're about to experience something special! 🌟✨
+              </div>
+            </div>
+
+            {scratchRevealed && (
+              <motion.button
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                onClick={() => setStage("quiz")}
+                className="mt-6 px-10 py-3 bg-pink-500 text-white rounded-full hover:scale-105 transition"
+              >
+                Continue 🚀
+              </motion.button>
+            )}
+          </motion.div>
+        )}
+
+        {/* 🎮 BIRTHDAY QUIZ */}
+        {stage === "quiz" && !showQuizResult && (
+          <motion.div
+            key="quiz"
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="bg-white rounded-3xl shadow-2xl px-12 py-12 text-center max-w-2xl"
+          >
+            <h2 className="text-3xl mb-8 text-gray-800">
+              Quick Birthday Quiz! 🎯
+            </h2>
+
+            {quizQuestions.map((quiz, idx) => (
+              <div key={idx} className="mb-8 text-left">
+                <p className="text-xl mb-4 font-semibold text-gray-700">{quiz.q}</p>
+                <div className="grid grid-cols-1 gap-3">
+                  {quiz.options.map((opt, optIdx) => (
+                    <button
+                      key={optIdx}
+                      onClick={() => setQuizAnswers({...quizAnswers, [idx]: optIdx})}
+                      className={`px-6 py-3 rounded-xl text-left transition ${
+                        quizAnswers[idx] === optIdx 
+                          ? 'bg-pink-500 text-white' 
+                          : 'bg-gray-100 hover:bg-gray-200'
+                      }`}
+                    >
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+
+            {Object.keys(quizAnswers).length === quizQuestions.length && (
+              <motion.button
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                onClick={() => setShowQuizResult(true)}
+                className="mt-4 px-10 py-3 bg-green-500 text-white rounded-full hover:scale-105 transition"
+              >
+                See Results! 🎉
+              </motion.button>
+            )}
+          </motion.div>
+        )}
+
+        {/* 🎊 QUIZ RESULT */}
+        {stage === "quiz" && showQuizResult && (
+          <motion.div
+            key="quiz-result"
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-3xl shadow-2xl px-12 py-12 text-center max-w-lg"
+          >
+            <h2 className="text-4xl mb-6 text-pink-500">
+              You're 100% AWESOME! 🌟
+            </h2>
+            <p className="text-xl text-gray-700 mb-8">
+              Because every answer about you is perfect! 💝
+            </p>
+            
             <button
-              onClick={() => {
-                musicRef.current.volume = 0.4;
-                musicRef.current.play();
-                setStage("question");
-              }}
-              className="px-12 py-4 bg-gradient-to-r from-pink-500 to-fuchsia-500
-                         text-white rounded-full text-xl shadow-lg hover:scale-105 transition"
+              onClick={() => setStage("photobooth")}
+              className="px-10 py-3 bg-gradient-to-r from-pink-500 to-purple-500 
+                       text-white rounded-full hover:scale-105 transition"
             >
-              Let’s Celebrate 🎂
+              Next Surprise 📸
             </button>
+          </motion.div>
+        )}
+
+        {/* 📸 PHOTO BOOTH */}
+        {stage === "photobooth" && (
+          <motion.div
+            key="photobooth"
+            initial={{ y: 40, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            className="bg-white rounded-3xl shadow-2xl px-12 py-12 text-center max-w-2xl"
+          >
+            <h2 className="text-3xl mb-6 text-gray-800">
+              Strike a Birthday Pose! 📸
+            </h2>
+
+            {!showCamera ? (
+              <button
+                onClick={() => {
+                  setShowCamera(true);
+                  startCamera();
+                }}
+                className="px-10 py-4 bg-pink-500 text-white rounded-full text-xl hover:scale-105 transition"
+              >
+                Open Camera 📷
+              </button>
+            ) : (
+              <div className="relative inline-block">
+                <video
+                  ref={videoRef}
+                  autoPlay
+                  playsInline
+                  className="rounded-2xl max-w-full"
+                  style={{ maxHeight: '400px' }}
+                />
+                
+                {/* Birthday Hat Overlay */}
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 text-6xl"
+                     style={{ marginTop: '-40px' }}>
+                  🎩
+                </div>
+                
+                {/* Crown Overlay */}
+                <div className="absolute top-0 right-4 text-5xl"
+                     style={{ marginTop: '-30px' }}>
+                  👑
+                </div>
+
+                <div className="mt-6 flex gap-4 justify-center">
+                  <button
+                    onClick={() => setStage("question")}
+                    className="px-8 py-3 bg-green-500 text-white rounded-full hover:scale-105 transition"
+                  >
+                    Looking Good! Continue 🚀
+                  </button>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
 
@@ -163,16 +506,48 @@ export default function App() {
                        text-white rounded-3xl shadow-2xl px-12 py-12 text-center"
           >
             <h2 className="text-3xl mb-10">
-              Have a look at it, Bhai!!! ✨
+              But first... open these gifts! 🎁
             </h2>
 
-            <button
-              onClick={() => setStage("cake")}
-              className="px-12 py-4 bg-white text-pink-600
-                         rounded-full text-xl hover:scale-110 transition"
-            >
-              Let’s Go 🚀
-            </button>
+            <div className="flex gap-6 justify-center flex-wrap mb-10">
+              {[0, 1, 2, 3].map((i) => (
+                <motion.div
+                  key={i}
+                  whileHover={{ scale: 1.1, rotate: 5 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => {
+                    if (!openedGifts.includes(i)) {
+                      setOpenedGifts([...openedGifts, i]);
+                    }
+                  }}
+                  className="cursor-pointer"
+                >
+                  {!openedGifts.includes(i) ? (
+                    <div className="text-6xl">🎁</div>
+                  ) : (
+                    <motion.div
+                      initial={{ scale: 0, rotate: -180 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      className="bg-white/20 backdrop-blur px-4 py-3 rounded-xl text-sm"
+                    >
+                      {giftMessages[i]}
+                    </motion.div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+
+            {openedGifts.length === 4 && (
+              <motion.button
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                onClick={() => setStage("cake")}
+                className="px-12 py-4 bg-white text-pink-600
+                           rounded-full text-xl hover:scale-110 transition"
+              >
+                Now Let's Go! 🚀
+              </motion.button>
+            )}
           </motion.div>
         )}
 
@@ -186,6 +561,16 @@ export default function App() {
           >
             <div className="absolute inset-0 aurora"></div>
 
+            {/* 🎊 CONFETTI */}
+            {showConfetti && [...Array(100)].map((_, i) => (
+              <span key={`c${i}`} className="confetti"
+                style={{ 
+                  left: `${Math.random() * 100}%`,
+                  animationDelay: `${Math.random() * 0.5}s`,
+                  backgroundColor: ['#ff6b9d', '#ffd93d', '#6bcf7f', '#4d9de0', '#e15554'][Math.floor(Math.random() * 5)]
+                }}></span>
+            ))}
+
             {[...Array(45)].map((_, i) => (
               <span key={`b${i}`} className="balloon"
                 style={{ left: `${Math.random() * 100}%` }}>🎈</span>
@@ -197,20 +582,75 @@ export default function App() {
             ))}
 
             <div className="text-center z-10">
+              {/* CANDLES */}
+              <div className="flex gap-6 justify-center mb-4">
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="relative">
+                    {i < candlesLit && (
+                      <motion.div
+                        className="absolute -top-8 left-1/2 -translate-x-1/2 text-2xl cursor-pointer"
+                        animate={{ scale: [1, 1.2, 1] }}
+                        transition={{ repeat: Infinity, duration: 0.5 }}
+                        onClick={() => {
+                          setCandlesLit(prev => {
+                            const newVal = Math.max(0, prev - 1);
+                            if (newVal === 0) {
+                              setShowConfetti(true);
+                              setTimeout(() => setShowConfetti(false), 5000);
+                            }
+                            return newVal;
+                          });
+                        }}
+                      >
+                        🕯️
+                      </motion.div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {candlesLit > 0 && (
+                <p className="text-white text-lg mb-4 bg-black/30 px-4 py-2 rounded-full">
+                  🎤 Blow into your mic or click candles to put them out!
+                </p>
+              )}
+
               <div className="w-56 h-16 bg-pink-200 rounded-t-3xl mx-auto"></div>
               <div className="w-64 h-18 bg-pink-300 rounded-3xl -mt-4 mx-auto"></div>
               <div className="w-72 h-24 bg-pink-400 rounded-3xl -mt-4
-                              flex items-center justify-center text-3xl shadow-xl">
-                🎂
+                              flex items-center justify-center text-3xl shadow-xl
+                              relative overflow-hidden">
+                {/* 3D Cake Layers with Animation */}
+                <motion.div
+                  className="absolute inset-0 bg-gradient-to-b from-pink-300 to-pink-500"
+                  animate={{ 
+                    boxShadow: [
+                      "0 0 20px rgba(255,182,193,0.5)",
+                      "0 0 40px rgba(255,105,180,0.8)",
+                      "0 0 20px rgba(255,182,193,0.5)"
+                    ]
+                  }}
+                  transition={{ repeat: Infinity, duration: 2 }}
+                />
+                <span className="relative z-10 text-4xl">🎂</span>
+                
+                {/* Frosting drips */}
+                <div className="absolute top-0 left-4 w-2 h-6 bg-white rounded-b-full opacity-70"></div>
+                <div className="absolute top-0 right-8 w-2 h-8 bg-white rounded-b-full opacity-70"></div>
+                <div className="absolute top-0 left-1/2 w-2 h-5 bg-white rounded-b-full opacity-70"></div>
               </div>
 
-              <button
-                onClick={() => setStage("final")}
-                className="mt-10 px-10 py-4 bg-white text-pink-600
-                           rounded-full text-lg hover:scale-110 transition"
-              >
-                Continue 💌
-              </button>
+              {candlesLit === 0 && (
+                <motion.button
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  onClick={() => setStage("final")}
+                  className="mt-10 px-10 py-4 bg-white text-pink-600
+                             rounded-full text-lg hover:scale-110 transition"
+                >
+                  Continue 💌
+                </motion.button>
+              )}
             </div>
           </motion.div>
         )}
@@ -221,19 +661,55 @@ export default function App() {
             key="final"
             initial={{ opacity: 0, y: 40 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl shadow-2xl px-14 py-12 text-center max-w-xl"
+            onAnimationComplete={() => setShowFireworks(true)}
+            className="bg-white rounded-3xl shadow-2xl px-14 py-12 text-center max-w-xl relative z-10"
           >
-            <p className="text-xl text-gray-700 leading-relaxed">
-              This isn’t just a surprise…  
-              <br />
-              it’s a small way of saying  
-              <br />
-              <span className="text-pink-500 font-semibold">
-                you matter more than you know 💗
-              </span>
-              <br /><br />
-              Happy Birthday 🎉
+            {/* 🎆 FIREWORKS */}
+            {showFireworks && (
+              <>
+                {[...Array(20)].map((_, i) => (
+                  <motion.div
+                    key={`fw${i}`}
+                    className="firework"
+                    initial={{ 
+                      scale: 0, 
+                      x: Math.random() * window.innerWidth - window.innerWidth/2,
+                      y: Math.random() * window.innerHeight - window.innerHeight/2
+                    }}
+                    animate={{ 
+                      scale: [0, 1, 0],
+                      opacity: [1, 1, 0]
+                    }}
+                    transition={{ 
+                      duration: 1.5,
+                      delay: i * 0.3,
+                      repeat: Infinity,
+                      repeatDelay: 6
+                    }}
+                    style={{
+                      position: 'fixed',
+                      width: '100px',
+                      height: '100px',
+                      borderRadius: '50%',
+                      border: '3px solid',
+                      borderColor: ['#ff6b9d', '#ffd93d', '#6bcf7f', '#4d9de0', '#e15554'][i % 5],
+                      left: '50%',
+                      top: '50%',
+                    }}
+                  />
+                ))}
+              </>
+            )}
+
+            {/* ✍️ TYPEWRITER TEXT */}
+            <p className="text-xl text-gray-700 leading-relaxed min-h-[120px]">
+              {typewriterText}
+              <span className="animate-pulse">|</span>
             </p>
+            
+            <div className="mt-6">
+              <p className="text-2xl font-bold text-pink-500">Happy Birthday 🎉</p>
+            </div>
           </motion.div>
         )}
 
@@ -266,6 +742,24 @@ export default function App() {
         }
         @keyframes floatUp {
           to { transform: translateY(-120vh); opacity: 0; }
+        }
+        .confetti {
+          position: absolute;
+          width: 10px;
+          height: 10px;
+          top: -10%;
+          animation: confettiFall 3s ease-out forwards;
+        }
+        @keyframes confettiFall {
+          0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+          100% { transform: translateY(120vh) rotate(720deg); opacity: 0; }
+        }
+        .firework {
+          pointer-events: none;
+          z-index: 9999;
+        }
+        canvas {
+          background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
       `}</style>
 
