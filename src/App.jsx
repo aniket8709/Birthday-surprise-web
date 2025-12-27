@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function App() {
 
   // 🔁 CHANGE TO false ON REAL BIRTHDAY
-  const TEST_MODE = true; // true = 10 sec test | false = real date
+  const TEST_MODE = false; // true = 10 sec test | false = real date
 
   const [stage, setStage] = useState("countdown");
   const [timeLeft, setTimeLeft] = useState(null);
@@ -55,8 +55,8 @@ export default function App() {
       target = new Date(Date.now() + 10 * 1000);
     } else {
       const now = new Date();
-      const birthdayMonth = 11; // October (0-indexed, so 9 = October)
-      const birthdayDay = 29;   // 9th day
+      const birthdayMonth = 9; // October (0-indexed, so 9 = October)
+      const birthdayDay = 9;   // 9th day
       
       // Try current year first
       target = new Date(now.getFullYear(), birthdayMonth, birthdayDay, 0, 0, 0);
