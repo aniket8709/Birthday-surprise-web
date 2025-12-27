@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function App() {
 
   // 🔁 CHANGE TO false ON REAL BIRTHDAY
-  const TEST_MODE = false; // true = 10 sec test | false = real date
+  const TEST_MODE = true; // true = 10 sec test | false = real date
 
   const [stage, setStage] = useState("countdown");
   const [timeLeft, setTimeLeft] = useState(null);
@@ -55,8 +55,8 @@ export default function App() {
       target = new Date(Date.now() + 10 * 1000);
     } else {
       const now = new Date();
-      const birthdayMonth = 9; // October (0-indexed, so 9 = October)
-      const birthdayDay = 9;   // 9th day
+      const birthdayMonth = 11; // October (0-indexed, so 9 = October)
+      const birthdayDay = 29;   // 9th day
       
       // Try current year first
       target = new Date(now.getFullYear(), birthdayMonth, birthdayDay, 0, 0, 0);
@@ -143,7 +143,7 @@ export default function App() {
   // ✍️ TYPEWRITER EFFECT
   useEffect(() => {
     if (stage === "final") {
-      const fullText = "This isn't just a surprise… it's a small way of saying you matter more than you know 💗";
+      const fullText = "This isn't just a surprise… it's a small way of saying you matter more than you know 💗...Hamesha khush raho , muskurate raho aur ladte raho ...Jaise ho hamesha waise hi rehna ";
       let index = 0;
       
       const timer = setInterval(() => {
@@ -483,7 +483,7 @@ export default function App() {
             className="bg-yellow-50 rounded-3xl shadow-xl px-10 py-10 text-center"
           >
             <p className="text-xl mb-8">
-              😏 Itna aasani se nahi bach paayega bhai!
+              😏 Itni aasani se nahi bach paoge!
             </p>
 
             <button
@@ -491,7 +491,7 @@ export default function App() {
               className="px-8 py-3 bg-yellow-400 rounded-full
                          text-lg hover:scale-105 transition"
             >
-              Accha dikha de 😭
+              Accha dikha hi do 😭
             </button>
           </motion.div>
         )}
@@ -708,7 +708,7 @@ export default function App() {
             </p>
             
             <div className="mt-6">
-              <p className="text-2xl font-bold text-pink-500">Happy Birthday 🎉</p>
+              <p className="text-2xl font-bold text-pink-500"> Happy Birthday 🎉</p>
             </div>
           </motion.div>
         )}
