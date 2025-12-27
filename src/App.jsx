@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 export default function App() {
 
   // 🔁 CHANGE TO false ON REAL BIRTHDAY
-  const TEST_MODE = true; // true = 10 sec test | false = real date
+  const TEST_MODE = false; // true = 10 sec test | false = real date
 
   const [stage, setStage] = useState("countdown");
   const [timeLeft, setTimeLeft] = useState(null);
