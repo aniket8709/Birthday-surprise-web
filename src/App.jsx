@@ -708,7 +708,7 @@ export default function App() {
             </p>
             
             <div className="mt-6">
-              <p className="text-2xl font-bold text-pink-500"> Happy Birthday 🎉</p>
+              <p className="text-2xl font-bold text-pink-500"> Happy Birthday Parmotion!! 🎉</p>
             </div>
           </motion.div>
         )}
